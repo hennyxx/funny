@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>给你的</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%; height: 100%; overflow: hidden;
+            background: linear-gradient(135deg, #e0f7ff 0%, #ffffff 50%, #f0f8ff 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            cursor: pointer;
+        }
+        canvas#bg { position: fixed; top: 0; left: 0; z-index: 1; }
+        .content {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 10; padding: 20px;
+        }
+        .text-container {
+            font-size: clamp(18px, 5vw, 28px); color: #4a90e2; line-height: 2;
+            text-align: center; font-weight: 300; max-width: 600px;
+            min-height: 200px; letter-spacing: 1px;
+        }
+        .final-section { opacity: 0; transition: opacity 1.5s ease; margin-top: 40px; }
+        .final-section.show { opacity: 1; }
+        .main-heart {
+            font-size: clamp(60px, 15vw, 100px); color: #7abaff;
+            animation: heartbeat 1.2s infinite ease-in-out; margin-bottom: 20px;
+        }
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+        .final-text {
+            font-size: clamp(22px, 6vw, 32px); color: #2d7dd2; font-weight: 400;
+            margin-bottom: 50px; letter-spacing: 2px;
+        }
+        .btn-group { display: flex; gap: 30px; position: relative; }
+        button {
+            padding: 12px 36px; border: none; border-radius: 50px;
+            font-size: clamp(16px, 4vw, 18px); font-family: inherit; cursor: pointer;
+            transition: all 0.3s ease; font-weight: 400;
+        }
+        .btn-yes {
+            background: linear-gradient(135deg, #7abaff, #4a90e2); color: white;
+            box-shadow: 0 8px 20px rgba(74, 144, 226, 0.3);
+        }
+        .btn-yes:hover { transform: scale(1.05); box-shadow: 0 10px 25px rgba(74, 144, 226, 0.4); }
+        .btn-no {
+            background: white; color: #88b8e6; border: 1px solid #c6e5ff;
+            position: absolute; right: -120px;
+        }
+        .success-modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
+            background: white; padding: 40px 60px; border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(74, 144, 226, 0.2); z-index: 100;
+            text-align: center; transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .success-modal.show { transform: translate(-50%, -50%) scale(1); }
+        .success-modal h2 { color: #4a90e2; font-size: clamp(20px, 5vw, 28px); font-weight: 400; }
+        .success-modal .heart { font-size: 50px; margin: 15px 0; color: #7abaff; }
+        .pop-text { position: fixed; font-size: 16px; color: #4a90e2; pointer-events: none; z-index: 50; animation: floatUp 1.5s ease-out forwards; }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-80px); }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="bg"></canvas>
+    <div class="content">
+        <div class="text-container" id="textBox"></div>
+        <div class="final-section" id="final">
+            <div class="main-heart">💙</div>
+            <div class="final-text">我喜欢你</div>
+            <div class="btn-group">
+                <button class="btn-yes" id="yesBtn">我也是</button>
+                <button class="btn-no" id="noBtn">再想想</button>
+            </div>
+        </div>
+    </div>
+    <div class="success-modal" id="modal">
+        <div class="heart">💙</div>
+        <h2>太好了呀✨</h2>
+    </div>
+
+<script>
+// 画布背景气泡
+const canvas = document.getElementById('bg');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// 漂浮气泡
+const bubbles = [];
+for (let i = 0; i < 60; i++) {
+    bubbles.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        size: Math.random() * 20 + 5,
+        speed: Math.random() * 0.8 + 0.2,
+        opacity: Math.random() * 0.3 + 0.1,
+        color: Math.random() > 0.3 ? '#c6e5ff' : '#ffffff'
+    });
+}
+
+// 鼠标跟随粒子
+const followers = [];
+const popTexts = ['嗯','心动','喜欢','看你','✨','💙','轻轻','是你'];
+
+// 点击爆炸
+function explode(x, y) {
+    for (let i = 0; i < 8; i++) {
+        followers.push({
+            x: x, y: y,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8,
+            size: Math.random() * 10 + 5,
+            life: 1,
+            isHeart: Math.random() > 0.3,
+            color: Math.random() > 0.5 ? '#7abaff' : '#ffffff'
+        });
+    }
+    // 弹出文字
+    if (Math.random() > 0.5) {
+        const text = popTexts[Math.floor(Math.random() * popTexts.length)];
+        const el = document.createElement('div');
+        el.className = 'pop-text';
+        el.textContent = text;
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1500);
+    }
+}
+
+document.addEventListener('click', e => explode(e.clientX, e.clientY));
+document.addEventListener('touchstart', e => explode(e.touches[0].clientX, e.touches[0].clientY));
+
+// 逃跑按钮
+const noBtn = document.getElementById('noBtn');
+function moveBtn() {
+    const x = Math.random() * (window.innerWidth - 100) - (window.innerWidth/2 - 50);
+    const y = Math.random() * 200 - 100;
+    noBtn.style.transform = `translate(${x}px, ${y}px)`;
+}
+noBtn.addEventListener('mouseenter', moveBtn);
+noBtn.addEventListener('touchstart', moveBtn);
+
+// 成功弹窗
+document.getElementById('yesBtn').addEventListener('click', () => {
+    document.getElementById('modal').classList.add('show');
+    // 撒爱心
+    for (let i = 0; i < 50; i++) {
+        setTimeout(() => {
+            explode(Math.random() * W, Math.random() * H);
+        }, i * 50);
+    }
+});
+
+// 打字效果
+const text = `有些话
+想了很久
+还是想亲口告诉你`;
+const textBox = document.getElementById('textBox');
+let idx = 0;
+function type() {
+    if (idx < text.length) {
+        const char = text[idx];
+        textBox.innerHTML += char === '\n' ? '<br>' : char;
+        idx++;
+        setTimeout(type, 150);
+    } else {
+        setTimeout(() => {
+            document.getElementById('final').classList.add('show');
+        }, 800);
+    }
+}
+setTimeout(type, 800);
+
+// 动画循环
+function animate() {
+    ctx.clearRect(0, 0, W, H);
+    // 画气泡
+    bubbles.forEach(b => {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+        ctx.fillStyle = b.color;
+        ctx.globalAlpha = b.opacity;
+        ctx.fill();
+        b.y -= b.speed;
+        if (b.y < -b.size) { b.y = H + b.size; b.x = Math.random() * W; }
+    });
+    ctx.globalAlpha = 1;
+    // 画跟随粒子
+    for (let i = followers.length - 1; i >= 0; i--) {
+        const p = followers[i];
+        p.x += p.vx; p.y += p.vy;
+        p.vy += 0.1; p.life -= 0.02;
+        ctx.globalAlpha = p.life;
+        if (p.isHeart) {
+            ctx.fillStyle = p.color;
+            ctx.font = p.size + 'px sans-serif';
+            ctx.fillText('💙', p.x, p.y);
+        } else {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+            ctx.fillStyle = p.color;
+            ctx.fill();
+        }
+        if (p.life <= 0) followers.splice(i, 1);
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(animate);
+}
+animate();
+</script>
+</body>
+</html>
