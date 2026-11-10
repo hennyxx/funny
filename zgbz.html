@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 严格手机适配：禁止缩放、适配刘海屏、锁定视口 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="white">
+    <title>2026年度专属运势测算</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            /* 适配刘海屏上下安全区域 */
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        }
+        /* 初始伪装页面：淡紫渐变，看起来是正经测算页 */
+        .start-page {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: white;
+            text-align: center;
+        }
+        .title {
+            font-size: clamp(24px, 8vw, 32px);
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .subtitle {
+            font-size: clamp(14px, 4.5vw, 16px);
+            opacity: 0.9;
+            margin-bottom: 60px;
+            line-height: 1.6;
+            padding: 0 10px;
+        }
+        .fortune-icon {
+            font-size: clamp(60px, 20vw, 80px);
+            margin-bottom: 40px;
+        }
+        .start-btn {
+            width: 80%;
+            max-width: 300px;
+            height: clamp(48px, 14vw, 56px);
+            border-radius: 28px;
+            background: white;
+            color: #667eea;
+            font-size: clamp(16px, 5vw, 18px);
+            font-weight: bold;
+            border: none;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .start-btn:active {
+            transform: scale(0.95);
+        }
+        /* 整蛊页面：亮黄色背景，满屏飞字 */
+        .prank-page {
+            width: 100%;
+            height: 100%;
+            background: #ffeb3b;
+            position: fixed;
+            top: 0;
+            left: 0;
+            display: none;
+            overflow: hidden;
+            z-index: 999;
+        }
+        .fly-text {
+            position: absolute;
+            font-size: clamp(20px, 7vw, 32px);
+            font-weight: bold;
+            color: #f44336;
+            animation: flyIn 2.5s ease-out forwards;
+            white-space: nowrap;
+        }
+        /* 结束弹窗 */
+        .end-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: white;
+            border-radius: 16px;
+            padding: 30px 25px;
+            width: 80%;
+            max-width: 280px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            z-index: 1000;
+            transition: transform 0.3s ease-out;
+        }
+        .end-modal.show {
+            transform: translate(-50%, -50%) scale(1);
+        }
+        .emoji-big {
+            font-size: 60px;
+            margin-bottom: 15px;
+        }
+        .end-text {
+            font-size: clamp(16px, 5vw, 18px);
+            color: #333;
+            margin-bottom: 25px;
+            line-height: 1.5;
+            font-weight: bold;
+        }
+        .ok-btn {
+            width: 100%;
+            height: 44px;
+            border-radius: 22px;
+            background: #667eea;
+            color: white;
+            border: none;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        @keyframes flyIn {
+            0% {
+                opacity: 0;
+                transform: scale(0) rotate(0deg);
+            }
+            20% {
+                opacity: 1;
+                transform: scale(1.2) rotate(10deg);
+            }
+            80% {
+                opacity: 1;
+                transform: scale(1) rotate(-5deg);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0.8) rotate(0deg);
+            }
+        }
+        /* 屏幕震动动画 */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+        .shake {
+            animation: shake 0.1s infinite;
+        }
+    </style>
+</head>
+<body>
+    <!-- 初始伪装页面 -->
+    <div class="start-page" id="startPage">
+        <div class="fortune-icon">🔮</div>
+        <div class="title">2026年度专属运势测算</div>
+        <div class="subtitle">
+            点一下按钮，看看你今年的<br>
+            财运/桃花运/事业运怎么样？
+        </div>
+        <button class="start-btn" id="startBtn">立即查看我的运势</button>
+    </div>
+
+    <!-- 整蛊动画页面 -->
+    <div class="prank-page" id="prankPage"></div>
+
+    <!-- 结束弹窗 -->
+    <div class="end-modal" id="endModal">
+        <div class="emoji-big">😜</div>
+        <div class="end-text">哈哈哈哈<br>你被我整到啦！<br>笨猪~</div>
+        <button class="ok-btn" id="okBtn">知道啦</button>
+    </div>
+
+    <script>
+        // 要飞出来的文字列表
+        const texts = ['笨猪🐷', '大笨蛋🤪', '被骗啦😝', '哈哈哈🤣', '你好傻😆', '上当了吧😜', '小笨猪🐽', '笑死我了😂'];
+        // 音频上下文（用Web Audio API生成猪叫音效，不需要外部音频文件，所有手机都能播放）
+        let audioCtx;
+
+        const startBtn = document.getElementById('startBtn');
+        const startPage = document.getElementById('startPage');
+        const prankPage = document.getElementById('prankPage');
+        const endModal = document.getElementById('endModal');
+        const okBtn = document.getElementById('okBtn');
+
+        // 生成随机位置
+        function getRandomPos() {
+            // 给文字留够边距，确保不会超出屏幕
+            return {
+                left: Math.random() * 80 + 5 + '%',
+                top: Math.random() * 80 + 5 + '%'
+            }
+        }
+
+        // 播放猪叫音效（内置生成，不需要外部文件，不会加载失败）
+        function playPigSound() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            // 生成3声猪叫
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    
+                    // 猪叫频率变化
+                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.2);
+                    
+                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                    
+                    osc.start(audioCtx.currentTime);
+                    osc.stop(audioCtx.currentTime + 0.3);
+                }, i * 400);
+            }
+        }
+
+        // 开始整蛊
+        startBtn.addEventListener('click', () => {
+            // 隐藏初始页面
+            startPage.style.display = 'none';
+            // 显示整蛊页面
+            prankPage.style.display = 'block';
+            // 屏幕震动
+            prankPage.classList.add('shake');
+            // 播放猪叫
+            playPigSound();
+
+            // 持续生成飞字，3秒内生成30个
+            let count = 0;
+            const createText = setInterval(() => {
+                if (count >= 30) {
+                    clearInterval(createText);
+                    return;
+                }
+                const text = document.createElement('div');
+                text.className = 'fly-text';
+                text.textContent = texts[Math.floor(Math.random() * texts.length)];
+                const pos = getRandomPos();
+                text.style.left = pos.left;
+                text.style.top = pos.top;
+                // 随机旋转角度
+                text.style.transform = `rotate(${(Math.random() - 0.5) * 60}deg)`;
+                prankPage.appendChild(text);
+                count++;
+                // 动画结束后移除元素
+                setTimeout(() => {
+                    text.remove();
+                }, 2500);
+            }, 100);
+
+            // 3秒后停止震动，弹出结束弹窗
+            setTimeout(() => {
+                prankPage.classList.remove('shake');
+                endModal.classList.add('show');
+            }, 3000);
+        });
+
+        // 点击知道了，重置页面可以再玩
+        okBtn.addEventListener('click', () => {
+            endModal.classList.remove('show');
+            prankPage.innerHTML = '';
+            prankPage.style.display = 'none';
+            startPage.style.display = 'flex';
+        });
+
+        // 防止手机双击缩放
+        document.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+    </script>
+</body>
+</html>
