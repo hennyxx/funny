@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>隧道</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Cpolygon points='16,4 27,16 16,28 5,16' fill='none' stroke='%2300f0ff' stroke-width='2'/%3E%3Cpolygon points='16,10 22,16 16,22 10,16' fill='none' stroke='%23ff00a8' stroke-width='2'/%3E%3C/svg%3E">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;overflow:hidden}
+body{
+  font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif;
+  -webkit-tap-highlight-color:transparent;user-select:none;
+}
+#cv{position:fixed;inset:0;width:100%;height:100%;display:block}
+
+/* 顶部提示 */
+#hint{
+  position:fixed;left:50%;top:calc(24px + env(safe-area-inset-top));
+  transform:translateX(-50%);
+  font-size:12px;letter-spacing:.2em;color:rgba(255,255,255,.6);
+  white-space:nowrap;z-index:3;
+  transition:opacity .6s ease;
+  text-indent:.2em;
+}
+#hint.out{opacity:0}
+
+/* 白闪 */
+#flash{
+  position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:5;
+}
+#flash.on{animation:flash .42s steps(2,end) both}
+@keyframes flash{0%{opacity:0}22%{opacity:1}100%{opacity:0}}
+
+/* 揭穿 */
+#reveal{
+  position:fixed;inset:0;z-index:20;display:none;
+  background:#000;color:#f2f2ee;
+  flex-direction:column;justify-content:center;
+  padding:40px 30px calc(38px + env(safe-area-inset-bottom));
+}
+#reveal.on{display:flex;animation:fadeup .5s ease both}
+@keyframes fadeup{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+#reveal .k{font-size:11px;letter-spacing:.26em;color:#565a5d;margin-bottom:18px}
+#reveal h2{
+  font-size:clamp(30px,9.4vw,44px);line-height:1.25;font-weight:800;letter-spacing:-.02em;
+  margin-bottom:18px;
+}
+#reveal h2 em{font-style:normal;color:#00f0ff}
+#reveal p{font-size:15px;line-height:1.9;color:#a4a7aa;margin-bottom:9px;max-width:430px}
+#reveal p b{color:#f2f2ee;font-weight:600}
+#reveal .acts{margin-top:28px;display:flex;flex-direction:column;gap:10px}
+#reveal button{
+  width:100%;height:54px;border:none;border-radius:8px;cursor:pointer;
+  font-family:inherit;font-size:15px;
+}
+#reveal .again{background:#f2f2ee;color:#000;font-weight:700}
+#reveal .share{background:transparent;color:#8e9194;border:1px solid #2e3032}
+#reveal .tiny{font-size:10.5px;line-height:1.9;color:#505356;margin-top:20px}
+
+#toast{
+  position:fixed;left:50%;bottom:26px;transform:translate(-50%,8px);z-index:40;
+  background:#191b1c;color:#fff;font-size:12.5px;padding:10px 16px;border-radius:6px;
+  opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;
+}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+
+<canvas id="cv"></canvas>
+<div id="hint">按住屏幕，会更快</div>
+<div id="flash"></div>
+
+<div id="reveal">
+  <div class="k">整蛊 · 结束</div>
+  <h2>你刚在一条<br><em>不存在的隧道</em>里<br>看了一会儿。</h2>
+  <p>它没有尽头，因为它根本没有在前进。<br>是颜色在往外跑，你原地没动。</p>
+  <p>这么说吧：<b>十六个多边形在画圈，加一个渐变，就骗到了你的眼睛。</b></p>
+  <div class="acts">
+    <button class="again" id="again">再掉进去一次</button>
+    <button class="share" id="share">复制文案</button>
+  </div>
+  <p class="tiny">本页面只用 Canvas 绘图，不加载任何资源，不读取任何信息。<br>如果你觉得晕，那是正常的，关掉就好。</p>
+</div>
+
+<div id="toast">已复制</div>
+
+<script>
+const cv    = document.getElementById("cv");
+const ctx   = cv.getContext("2d");
+const hint  = document.getElementById("hint");
+const flash = document.getElementById("flash");
+const reveal= document.getElementById("reveal");
+
+let W = 0, H = 0, cx = 0, cy = 0, maxR = 0, dpr = 1;
+
+function resize(){
+  dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  cv.width  = Math.round(W * dpr);
+  cv.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cx = W / 2;
+  cy = H / 2;
+  maxR = Math.hypot(cx, cy) * 1.15;
+}
+resize();
+window.addEventListener("resize", resize, {passive:true});
+
+const LAYERS = 16;
+
+let t = 0;            // 相位
+let speed = 1;
+let running = true;
+let rafId = 0;
+let hold = false;
+let endTimer = null;
+
+function frame(){
+  if (!running) return;
+
+  t += 0.0062 * speed;
+
+  // 背景：留一点残影，让运动更顺
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "rgba(0,0,0,0.34)";
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.globalCompositeOperation = "lighter";
+
+  // 中心核心
+  const coreR = 26 + Math.sin(t * 9) * 5;
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 2.4);
+  g.addColorStop(0, "rgba(255,255,255,0.95)");
+  g.addColorStop(0.35, "rgba(150,240,255,0.5)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, coreR * 2.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 同心多边形
+  for (let i = 0; i < LAYERS; i++){
+    let p = (i / LAYERS + t * 1.9) % 1;      // 每层的推进位置
+    const ease = Math.pow(p, 2.7);
+    const r = 6 + ease * maxR;
+
+    const sides = 3 + (i % 4) * 2;           // 3 5 7 9 边交替
+    const hue   = (i * 24 + t * 320) % 360;
+    const alpha = Math.min(1, (1 - p) * 1.35) * (0.35 + 0.65 * (1 - ease));
+
+    ctx.beginPath();
+    const spin = t * 5 + i * 0.4;
+    for (let k = 0; k <= sides; k++){
+      const a  = (k / sides) * Math.PI * 2 + spin;
+      const rr = r * (1 + 0.16 * Math.sin(k * 2.4 + t * 7 + i * 0.7));
+      const x  = cx + Math.cos(a) * rr;
+      const y  = cy + Math.sin(a) * rr;
+      if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = "hsla(" + hue + ",100%,62%," + alpha.toFixed(3) + ")";
+    ctx.lineWidth = 1 + ease * 12;
+    ctx.stroke();
+
+    // 内描边，模拟发光而不必用 shadowBlur
+    if (alpha > 0.25){
+      ctx.strokeStyle = "hsla(" + ((hue + 40) % 360) + ",100%,80%," + (alpha * 0.45).toFixed(3) + ")";
+      ctx.lineWidth = 0.8 + ease * 3;
+      ctx.stroke();
+    }
+  }
+
+  // 边缘压暗，收拢视线
+  ctx.globalCompositeOperation = "source-over";
+  const vig = ctx.createRadialGradient(cx, cy, maxR * 0.55, cx, cy, maxR);
+  vig.addColorStop(0, "rgba(0,0,0,0)");
+  vig.addColorStop(1, "rgba(0,0,0,0.92)");
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+
+  rafId = requestAnimationFrame(frame);
+}
+
+function start(){
+  clearTimeout(endTimer);
+  reveal.classList.remove("on");
+  flash.classList.remove("on");
+  t = 0; speed = 1; running = true;
+  hint.classList.remove("out");
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, W, H);
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(frame);
+
+  setTimeout(() => hint.classList.add("out"), 1800);
+
+  // 5.6 秒后骤停
+  endTimer = setTimeout(() => {
+    running = false;
+    cancelAnimationFrame(rafId);
+    flash.classList.add("on");
+    setTimeout(() => reveal.classList.add("on"), 620);
+  }, 5600);
+}
+
+/* 按住加速 */
+cv.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  hold = true; speed = 3.2;
+});
+window.addEventListener("pointerup", () => { hold = false; speed = 1; });
+window.addEventListener("pointercancel", () => { hold = false; speed = 1; });
+
+document.getElementById("again").addEventListener("click", start);
+
+document.getElementById("share").addEventListener("click", () => {
+  const text = "我盯着一条不存在的隧道看了五秒，还按着屏幕让它跑快点。";
+  const done = () => {
+    const el = document.getElementById("toast");
+    el.classList.add("on");
+    setTimeout(() => el.classList.remove("on"), 1600);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(done);
+  } else { done(); }
+});
+
+start();
+</script>
+</body>
+</html>
